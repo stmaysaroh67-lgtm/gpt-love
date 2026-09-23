@@ -8,8 +8,16 @@
     },
     
     "forwardPorts": [3001],
+    "portsAttributes": {
+        "3001": {
+            "label": "API Gateway",
+            "visibility": "public"
+        }
+    },
     
-    "postCreateCommand": "sed -i 's/\r$//' .devcontainer/setup.sh && bash .devcontainer/setup.sh",
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0",
+    
+    "postStartCommand": "npm install && sudo npm install -g pm2 && pm2 delete all || true && pm2 start gateway.js --name ai-gateway",
     
     "customizations": {
         "vscode": {
