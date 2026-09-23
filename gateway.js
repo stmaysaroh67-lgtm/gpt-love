@@ -215,7 +215,7 @@ async function jalankanProtokolEstafet() {
     
     // 1. Dapatkan Repo Utama untuk dikloning
     const repoFullName = process.env.GITHUB_REPOSITORY || "USER/REPO_UTAMA"; 
-    if (repoFullName === "USER/REPO_UTAMA") {
+    if (repoFullName === "stmaysaroh67-lgtm/gpt-love") {
         console.log(`[ESTAFET] ⚠️ Peringatan: Nama repository belum diset. Pastikan .devcontainer berjalan benar.`);
     }
 
