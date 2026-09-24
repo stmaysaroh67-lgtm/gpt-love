@@ -1,6 +1,7 @@
 {
     "name": "AI Stealth Gateway",
-    "image": "mcr.microsoft.com/devcontainers/universal:2",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:20-jammy",
+    "remoteUser": "node",
     
     "hostRequirements": {
         "cpus": 4,
@@ -15,9 +16,7 @@
         }
     },
     
-    "onCreateCommand": "git lfs install --force",
+    "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list || true && sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0",
     
-    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 && npm install",
-    
-    "postStartCommand": "npx --yes pm2 delete all || true && npx --yes pm2 start npm --name 'ai-gateway' -- run start"
+    "postStartCommand": "npm install && npx --yes pm2 delete all || true && npx --yes pm2 start npm --name 'ai-gateway' -- run start"
 }
