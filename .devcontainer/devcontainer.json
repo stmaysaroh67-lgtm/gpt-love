@@ -1,5 +1,6 @@
 {
     "name": "AI Stealth Gateway",
+    "image": "mcr.microsoft.com/devcontainers/universal:2",
     
     "hostRequirements": {
         "cpus": 4,
@@ -14,7 +15,9 @@
         }
     },
     
-    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0",
+    "onCreateCommand": "git lfs install --force",
     
-    "postStartCommand": "nohup npm start > gateway_live.log 2>&1 &"
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 && npm install",
+    
+    "postStartCommand": "npx --yes pm2 delete all || true && npx --yes pm2 start npm --name 'ai-gateway' -- run start"
 }
