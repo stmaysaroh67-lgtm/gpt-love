@@ -7,13 +7,17 @@ const { Camoufox } = require('camoufox-js');
 const { Redis } = require('@upstash/redis');
 const chatgptModule = require('./platforms/chatgpt');
 
+// 🌟 MENYALAKAN VIRTUAL DISPLAY (XVFB)
+const xvfb = spawn('Xvfb', [':99', '-screen', '0', '1280x800x24']);
+process.env.DISPLAY = ':99';
+
 // 🌟 KREDENSIAL REDIS
 const redis = new Redis({
   url: 'https://pro-troll-111005.upstash.io', 
   token: 'gQAAAAAAAbGdAAIgcDIxMjg3MmE5NGIwNzY0MDNjOTJjMzA0ZTY5ZDc3YmMxYg',
 });
 
-const MAX_COOKIES = 150; 
+const MAX_COOKIES = 150; // KOREKSI: 150 Akun ChatGPT
 const PORT = 3001;
 const app = express();
 
@@ -52,8 +56,8 @@ monitorProxy();
 // =====================================================================
 // 🌟 VARIABEL STATUS GLOBAL
 // =====================================================================
-let isRetiring = false;      
-let jumlahTugasAktif = 0;    
+let isRetiring = false;      // Tanda bahwa mesin ini sedang pensiun
+let jumlahTugasAktif = 0;    // Penghitung tugas yang sedang berjalan untuk Graceful Draining
 
 async function dapatkanSesiCookie() {
     let index = await redis.incr('global_chatgpt_index');
@@ -73,9 +77,10 @@ async function dapatkanSesiCookie() {
 }
 
 app.post('/api/generate', async (req, res) => {
+    // 🌟 Jika mesin sedang pensiun (menunggu mati), tolak tugas baru agar dilempar ke mesin penerus
     if (isRetiring) return res.status(503).json({ error: "Sistem estafet aktif. Silakan request ulang." });
 
-    jumlahTugasAktif++; 
+    jumlahTugasAktif++; // Mendaftarkan tugas masuk
     
     const { action = 'CHAT', prompt, isThinkingMode = false, fileArray = [] } = req.body;
     let translatedFiles = [];
@@ -110,13 +115,24 @@ app.post('/api/generate', async (req, res) => {
 
         if (gunakanProxy) {
             Object.assign(baseFirefoxPrefs, {
-                'network.proxy.type': 1, 'network.proxy.socks': 'adpfmxukjo.localto.net',
-                'network.proxy.socks_port': 4971, 'network.proxy.socks_version': 5,
-                'network.proxy.socks_remote_dns': true, 'network.dns.disableIPv6': true
+                'network.proxy.type': 1,
+                'network.proxy.socks': 'adpfmxukjo.localto.net',
+                'network.proxy.socks_port': 4971,
+                'network.proxy.socks_version': 5,
+                'network.proxy.socks_remote_dns': true,
+                'network.dns.disableIPv6': true
             });
-        } else { baseFirefoxPrefs['network.proxy.type'] = 0; }
+        } else {
+            baseFirefoxPrefs['network.proxy.type'] = 0; 
+        }
 
-        browser = await Camoufox({ headless: true, width: 1280, height: 720, geoip: gunakanProxy, firefoxUserPrefs: baseFirefoxPrefs });
+        browser = await Camoufox({
+            headless: true,
+            width: 1280, height: 720,
+            geoip: gunakanProxy, 
+            firefoxUserPrefs: baseFirefoxPrefs
+        });
+
         context = await browser.newContext({ acceptDownloads: true });
         await context.addCookies(sesi.cookies);
 
@@ -129,7 +145,7 @@ app.post('/api/generate', async (req, res) => {
         console.error(`[GATEWAY] ❌ TUGAS GAGAL: ${error.message}`);
         res.status(500).json({ status: "failed", error: error.message });
     } finally {
-        jumlahTugasAktif--; 
+        jumlahTugasAktif--; // Melepaskan registrasi tugas saat selesai (sukses/gagal)
         console.log(`[GATEWAY] 📉 Tugas selesai. Pekerja Aktif Tersisa: ${jumlahTugasAktif}`);
         
         if (context) await context.close().catch(()=>{});
@@ -141,6 +157,7 @@ app.post('/api/generate', async (req, res) => {
 // =====================================================================
 // 🌟 FUNGSI DEMO REQUEST AWAL (STARTUP QC TEST)
 // =====================================================================
+// 🌟 PERBAIKAN: Menerima parameter activeUrl untuk ditahan publikasinya
 async function jalankanDemoAwal(activeUrl) {
     console.log(`\n[SYSTEM-DEMO] 🚀 Memulai tes Quality Control (Demo Request) ke ChatGPT...`);
     let browser, context;
@@ -173,6 +190,8 @@ async function jalankanDemoAwal(activeUrl) {
         console.log(`🎉 [DEMO SUKSES] Sistem Otomasi 100% Sehat!`);
         console.log(`🤖 Pesan dari ChatGPT: "${hasil.text}"`);
         
+        // 🌟 KUNCI ZERO-DOWNTIME: 
+        // URL baru di-publish ke Redis SETELAH tes QC benar-benar berhasil!
         if (activeUrl) {
             await redis.set('active_gateway_url', activeUrl);
             console.log(`[SYSTEM] 🟢 TAUTAN CLOUDFLARE DIBUKA: Vercel sekarang dialihkan ke mesin ini!`);
@@ -194,18 +213,19 @@ async function jalankanDemoAwal(activeUrl) {
 async function jalankanProtokolEstafet() {
     console.log(`\n[ESTAFET] ⏰ Waktu shift habis. Memulai protokol rotasi Ping-Pong...`);
     
-    // 🌟 KOREKSI: Secara otomatis mengambil nama repo dari env variable Github
-    const repoFullName = process.env.GITHUB_REPOSITORY; 
-    if (!repoFullName) {
-        console.error(`[ESTAFET] ❌ ERROR: GITHUB_REPOSITORY environment variable tidak ditemukan!`);
-        return;
+    // 1. Dapatkan Repo Utama untuk dikloning
+    const repoFullName = process.env.GITHUB_REPOSITORY || "USER/REPO_UTAMA"; 
+    if (repoFullName === "USER/REPO_UTAMA") {
+        console.log(`[ESTAFET] ⚠️ Peringatan: Nama repository belum diset. Pastikan .devcontainer berjalan benar.`);
     }
 
     try {
-        let rawPats = await redis.get('github_pats') || []; 
-        let patShifts = await redis.get('pat_shift_quota') || {}; 
-        let myPat = await redis.get('current_active_pat'); 
+        // 2. Baca Database PAT dari Redis
+        let rawPats = await redis.get('github_pats') || []; // List stok PAT manual
+        let patShifts = await redis.get('pat_shift_quota') || {}; // Catatan nyawa shift (1 PAT = 4 Shift)
+        let myPat = await redis.get('current_active_pat'); // PAT yang sedang menjalankan mesin ini
 
+        // Saring PAT: Beri 4 nyawa awal jika baru, buang jika nyawa 0
         let validPats = rawPats.filter(pat => {
             if (patShifts[pat] === undefined) patShifts[pat] = 4;
             return patShifts[pat] > 0;
@@ -216,18 +236,24 @@ async function jalankanProtokolEstafet() {
             return;
         }
 
+        // 3. Logika Pemilihan "Ping-Pong"
+        // Ambil PAT urutan pertama. Jika urutan pertama adalah milik kita sendiri, pilih urutan kedua.
         let nextPat = validPats[0];
         if (validPats.length > 1 && nextPat === myPat) {
             nextPat = validPats[1];
         }
 
+        // 4. Kurangi nyawa shift PAT yang terpilih
         patShifts[nextPat] -= 1;
         await redis.set('pat_shift_quota', patShifts);
-        await redis.set('current_active_pat', nextPat); 
+        await redis.set('current_active_pat', nextPat); // Serahkan tahta ke PAT berikutnya
+        
+        // Bersihkan PAT yang sudah habis (auto-delete burner accounts) dari list array
         await redis.set('github_pats', validPats.filter(p => patShifts[p] > 0)); 
         
         console.log(`[ESTAFET] 🎟️ Mendelegasikan tugas ke PAT baru. Sisa nyawa PAT penerus: ${patShifts[nextPat]} shift.`);
 
+        // 5. Tembak API GitHub untuk membangunkan mesin 16GB
         const repoRes = await fetch(`https://api.github.com/repos/${repoFullName}`, {
             headers: { 'Authorization': `Bearer ${nextPat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
         });
@@ -241,7 +267,7 @@ async function jalankanProtokolEstafet() {
             headers: { 'Authorization': `Bearer ${nextPat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
             body: JSON.stringify({
                 repository_id: repoData.id,
-                machine: "standardLinux", 
+                machine: "standardLinux", // PAKSAAN MESIN 16GB
                 idle_timeout_minutes: 240
             })
         });
@@ -252,16 +278,19 @@ async function jalankanProtokolEstafet() {
         }
         console.log(`[ESTAFET] ✅ Pabrik siluman penerus sukses dipesan dan sedang booting!`);
 
+        // 6. SINKRONISASI DETAK JANTUNG (HEARTBEAT CHECK)
         console.log(`[ESTAFET] 📡 Menunggu mesin penerus menyelesaikan QC dan mengambil alih rute Cloudflare...`);
         const oldUrl = await redis.get('active_gateway_url');
         
         const pantauPengambilalihan = setInterval(async () => {
             const currentUrl = await redis.get('active_gateway_url');
             
+            // Jika URL di Redis sudah berubah, artinya mesin penerus sudah siap!
             if (currentUrl && currentUrl !== oldUrl) {
                 clearInterval(pantauPengambilalihan);
                 console.log(`\n[ESTAFET] 🔄 PENGAMBILALIHAN BERHASIL! Rute tugas telah berpindah.`);
                 
+                // 7. PENYEKATAN DAN GRACEFUL DRAINING
                 isRetiring = true; 
                 console.log(`[ESTAFET] 🛑 Menolak tugas baru. Menunggu ${jumlahTugasAktif} tugas tersisa diselesaikan...`);
                 
@@ -273,13 +302,14 @@ async function jalankanProtokolEstafet() {
                         try {
                             const currentCodespaceName = process.env.CODESPACE_NAME;
                             if (currentCodespaceName && myPat) {
+                                // Menghancurkan diri sendiri dari akun GitHub
                                 await fetch(`https://api.github.com/user/codespaces/${currentCodespaceName}`, {
                                     method: 'DELETE',
                                     headers: { 'Authorization': `Bearer ${myPat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
                                 });
                             }
                         } catch (e) {}
-                        process.exit(0); 
+                        process.exit(0); // Matikan Node.js
                     }
                 }, 5000);
             }
@@ -325,6 +355,7 @@ app.listen(PORT, async () => {
                 const SHIFT_DURATION_MS = 3 * 60 * 60 * 1000; 
                 setTimeout(jalankanProtokolEstafet, SHIFT_DURATION_MS);
                 
+                // 🌟 Meneruskan URL ke fungsi Demo untuk diuji terlebih dahulu
                 await jalankanDemoAwal(activeUrl);
             }
         });
