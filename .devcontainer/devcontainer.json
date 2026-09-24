@@ -1,6 +1,8 @@
 {
     "name": "AI Stealth Gateway",
     "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+    "remoteUser": "node",
+    "containerUser": "node",
     
     "hostRequirements": {
         "cpus": 4,
@@ -15,7 +17,7 @@
         }
     },
     
-    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 && npm install && sudo npm install -g pm2 && mkdir -p ~/.vscode-server/data/Machine ~/.vscode-remote/data/Machine && echo '{\"security.workspace.trust.enabled\":false, \"security.workspace.trust.startupPrompt\":\"never\"}' > ~/.vscode-server/data/Machine/settings.json && echo '{\"security.workspace.trust.enabled\":false, \"security.workspace.trust.startupPrompt\":\"never\"}' > ~/.vscode-remote/data/Machine/settings.json",
+    "updateContentCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 && npm install && sudo npm install -g pm2",
     
-    "postStartCommand": "pm2 delete all || true && pm2 start npm --name 'ai-gateway' -- run start"
+    "postStartCommand": "pm2 delete all || true && pm2 start npm --name 'ai-gateway' -- run start > startup.log 2>&1"
 }
