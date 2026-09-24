@@ -21,7 +21,10 @@
     
     "customizations": {
         "vscode": {
-            "settings": {},
+            "settings": {
+                "security.workspace.trust.enabled": false,
+                "security.workspace.trust.startupPrompt": "never"
+            },
             "extensions": []
         }
     }
