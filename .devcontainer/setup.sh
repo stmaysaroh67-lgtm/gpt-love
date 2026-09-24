@@ -13,12 +13,13 @@ echo "[SETUP] Menginstal Xvfb dan dependensi grafis tingkat lanjut..."
 sudo apt-get update
 sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 wget curl
 
-# 3. Membersihkan Arsitektur Lama & Memasang Modul Generasi Baru
-echo "[SETUP] Menyesuaikan dependensi NPM (Redis, Camoufox, Playwright)..."
+# 3. Membersihkan Arsitektur Lama & Memasang Modul Generasi Baru + PM2
+echo "[SETUP] Menyesuaikan dependensi NPM (Redis, Camoufox, Playwright, PM2)..."
 npm uninstall puppeteer-core puppeteer-extra puppeteer-extra-plugin-stealth
 npm install express cors @upstash/redis camoufox-js playwright
+npm install -g pm2 
 
-# 4. Memaksa instalasi dependensi OS Ubuntu tingkat rendah untuk Firefox/Playwright
+# 4. Memaksa instalasi dependensi OS Ubuntu tingkat rendah untuk Playwright
 echo "[SETUP] Mengunduh paket OS tingkat rendah via Playwright..."
 npx playwright install-deps firefox
 
