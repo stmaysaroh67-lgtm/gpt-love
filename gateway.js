@@ -7,10 +7,6 @@ const { Camoufox } = require('camoufox-js');
 const { Redis } = require('@upstash/redis');
 const chatgptModule = require('./platforms/chatgpt');
 
-// 🌟 MENYALAKAN VIRTUAL DISPLAY (XVFB)
-const xvfb = spawn('Xvfb', [':99', '-screen', '0', '1280x800x24']);
-process.env.DISPLAY = ':99';
-
 // 🌟 KREDENSIAL REDIS
 const redis = new Redis({
   url: 'https://pro-troll-111005.upstash.io', 
