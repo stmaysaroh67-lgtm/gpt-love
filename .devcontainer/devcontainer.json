@@ -1,22 +1,10 @@
 {
-    "name": "AI Stealth Gateway",
-    "image": "mcr.microsoft.com/devcontainers/javascript-node:20-jammy",
-    "remoteUser": "node",
-    
-    "hostRequirements": {
-        "cpus": 4,
-        "memory": "16gb"
-    },
-    
-    "forwardPorts": [3001],
-    "portsAttributes": {
-        "3001": {
-            "label": "API Gateway",
-            "visibility": "public"
-        }
-    },
-    
-    "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list || true && sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0",
-    
-    "postStartCommand": "npm install && npx --yes pm2 delete all || true && npx --yes pm2 start npm --name 'ai-gateway' -- run start"
+  "name": "ChatGPT Automation Gateway",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb"
+  },
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && bash .devcontainer/setup.sh",
+  "postStartCommand": "nohup node gateway.js > system.log 2>&1 &"
 }
