@@ -1,8 +1,6 @@
 {
     "name": "AI Stealth Gateway",
-    "build": {
-        "dockerfile": "Dockerfile"
-    },
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
     
     "hostRequirements": {
         "cpus": 4,
@@ -17,9 +15,9 @@
         }
     },
     
-    "updateContentCommand": "npm install && sudo npm install -g pm2",
+    "updateContentCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0",
     
-    "postStartCommand": "pm2 delete all || true && pm2 start npm --name 'ai-gateway' -- start",
+    "postStartCommand": "npm install && sudo npm install -g pm2 && pm2 delete all || true && pm2 start npm --name 'ai-gateway' -- run start",
     
     "customizations": {
         "vscode": {
