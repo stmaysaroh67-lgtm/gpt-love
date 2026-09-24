@@ -14,5 +14,7 @@
         }
     },
     
-    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 && npm install && echo 'if ! npx pm2 status | grep -q \"ai-gateway\"; then cd /workspaces/* && npx pm2 start npm --name \"ai-gateway\" -- run start; fi' >> ~/.bashrc"
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb libgl1 libglx-mesa0 libosmesa6 libgbm-dev libnss3 libasound2 libatk-bridge2.0-0 libgtk-3-0 && npm install && npm install -g pm2",
+    
+    "postStartCommand": "pm2 delete all || true && pm2 start npm --name 'ai-gateway' -- run start"
 }
