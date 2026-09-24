@@ -6,5 +6,5 @@
     "memory": "16gb"
   },
   "postCreateCommand": "chmod +x .devcontainer/setup.sh && bash .devcontainer/setup.sh",
-  "postStartCommand": "nohup node gateway.js > system.log 2>&1 &"
+  "postStartCommand": "pm2 start gateway.js --name 'gateway-otomatis'"
 }
