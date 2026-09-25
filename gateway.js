@@ -17,7 +17,7 @@ const redis = new Redis({
   token: 'gQAAAAAAAbGdAAIgcDIxMjg3MmE5NGIwNzY0MDNjOTJjMzA0ZTY5ZDc3YmMxYg',
 });
 
-const MAX_COOKIES = 150; // KOREKSI: 150 Akun ChatGPT
+const MAX_COOKIES = 150; 
 const PORT = 3001;
 const app = express();
 
@@ -56,8 +56,8 @@ monitorProxy();
 // =====================================================================
 // 🌟 VARIABEL STATUS GLOBAL
 // =====================================================================
-let isRetiring = false;      // Tanda bahwa mesin ini sedang pensiun
-let jumlahTugasAktif = 0;    // Penghitung tugas yang sedang berjalan untuk Graceful Draining
+let isRetiring = false;      
+let jumlahTugasAktif = 0;    
 
 async function dapatkanSesiCookie() {
     let index = await redis.incr('global_chatgpt_index');
@@ -77,10 +77,9 @@ async function dapatkanSesiCookie() {
 }
 
 app.post('/api/generate', async (req, res) => {
-    // 🌟 Jika mesin sedang pensiun (menunggu mati), tolak tugas baru agar dilempar ke mesin penerus
     if (isRetiring) return res.status(503).json({ error: "Sistem estafet aktif. Silakan request ulang." });
 
-    jumlahTugasAktif++; // Mendaftarkan tugas masuk
+    jumlahTugasAktif++; 
     
     const { action = 'CHAT', prompt, isThinkingMode = false, fileArray = [] } = req.body;
     let translatedFiles = [];
@@ -145,7 +144,7 @@ app.post('/api/generate', async (req, res) => {
         console.error(`[GATEWAY] ❌ TUGAS GAGAL: ${error.message}`);
         res.status(500).json({ status: "failed", error: error.message });
     } finally {
-        jumlahTugasAktif--; // Melepaskan registrasi tugas saat selesai (sukses/gagal)
+        jumlahTugasAktif--; 
         console.log(`[GATEWAY] 📉 Tugas selesai. Pekerja Aktif Tersisa: ${jumlahTugasAktif}`);
         
         if (context) await context.close().catch(()=>{});
@@ -157,7 +156,6 @@ app.post('/api/generate', async (req, res) => {
 // =====================================================================
 // 🌟 FUNGSI DEMO REQUEST AWAL (STARTUP QC TEST)
 // =====================================================================
-// 🌟 PERBAIKAN: Menerima parameter activeUrl untuk ditahan publikasinya
 async function jalankanDemoAwal(activeUrl) {
     console.log(`\n[SYSTEM-DEMO] 🚀 Memulai tes Quality Control (Demo Request) ke ChatGPT...`);
     let browser, context;
@@ -190,8 +188,6 @@ async function jalankanDemoAwal(activeUrl) {
         console.log(`🎉 [DEMO SUKSES] Sistem Otomasi 100% Sehat!`);
         console.log(`🤖 Pesan dari ChatGPT: "${hasil.text}"`);
         
-        // 🌟 KUNCI ZERO-DOWNTIME: 
-        // URL baru di-publish ke Redis SETELAH tes QC benar-benar berhasil!
         if (activeUrl) {
             await redis.set('active_gateway_url', activeUrl);
             console.log(`[SYSTEM] 🟢 TAUTAN CLOUDFLARE DIBUKA: Vercel sekarang dialihkan ke mesin ini!`);
@@ -213,61 +209,64 @@ async function jalankanDemoAwal(activeUrl) {
 async function jalankanProtokolEstafet() {
     console.log(`\n[ESTAFET] ⏰ Waktu shift habis. Memulai protokol rotasi Ping-Pong...`);
     
-    // 1. Dapatkan Repo Utama untuk dikloning
-    const repoFullName = process.env.GITHUB_REPOSITORY || "USER/REPO_UTAMA"; 
-    if (repoFullName === "USER/REPO_UTAMA") {
-        console.log(`[ESTAFET] ⚠️ Peringatan: Nama repository belum diset. Pastikan .devcontainer berjalan benar.`);
+    const repoFullName = process.env.GITHUB_REPOSITORY; 
+    if (!repoFullName) {
+        console.error(`[ESTAFET] ❌ ERROR: GITHUB_REPOSITORY environment variable tidak terdeteksi!`);
+        return;
     }
 
     try {
-        // 2. Baca Database PAT dari Redis
-        let rawPats = await redis.get('github_pats') || []; // List stok PAT manual
-        let patShifts = await redis.get('pat_shift_quota') || {}; // Catatan nyawa shift (1 PAT = 4 Shift)
-        let myPat = await redis.get('current_active_pat'); // PAT yang sedang menjalankan mesin ini
+        let rawPats = await redis.get('github_pats') || []; 
+        let patShifts = await redis.get('pat_shift_quota') || {}; 
+        
+        // 🌟 PERBAIKAN 1: Ekstraksi String Super Ketat (Anti-Spasi Siluman)
+        let rawMyPat = await redis.get('current_active_pat');
+        let myPat = (typeof rawMyPat === 'string' ? rawMyPat : "").trim();
 
-        // Saring PAT: Beri 4 nyawa awal jika baru, buang jika nyawa 0
         let validPats = rawPats.filter(pat => {
             if (patShifts[pat] === undefined) patShifts[pat] = 4;
             return patShifts[pat] > 0;
         });
 
         if (validPats.length === 0) {
-            console.error(`[ESTAFET] ❌ FATAL ERROR: STOK GITHUB PAT HABIS! SILAKAN ISI ULANG REDIS!`);
+            console.error(`[ESTAFET] ❌ FATAL ERROR: STOK GITHUB PAT HABIS!`);
             return;
         }
 
-        // 3. Logika Pemilihan "Ping-Pong"
-        // Ambil PAT urutan pertama. Jika urutan pertama adalah milik kita sendiri, pilih urutan kedua.
-        let nextPat = validPats[0];
-        if (validPats.length > 1 && nextPat === myPat) {
-            nextPat = validPats[1];
+        // 🌟 PERBAIKAN 2: Logika Ping-Pong Eksplisit (Mengeliminasi PAT yang sedang dipakai)
+        let availablePats = validPats.filter(pat => pat.trim() !== myPat);
+        
+        let nextPat;
+        if (availablePats.length > 0) {
+            nextPat = availablePats[0]; // Oper ke akun/PAT lain yang tersedia
+        } else {
+            nextPat = validPats[0]; // Terpaksa pakai akun sendiri jika nyawa akun lain habis
+            console.log(`[ESTAFET] ⚠️ Peringatan: Tidak ada PAT alternatif. Menggunakan ulang PAT saat ini.`);
         }
 
-        // 4. Kurangi nyawa shift PAT yang terpilih
         patShifts[nextPat] -= 1;
         await redis.set('pat_shift_quota', patShifts);
-        await redis.set('current_active_pat', nextPat); // Serahkan tahta ke PAT berikutnya
+        await redis.set('current_active_pat', nextPat.trim()); 
         
-        // Bersihkan PAT yang sudah habis (auto-delete burner accounts) dari list array
         await redis.set('github_pats', validPats.filter(p => patShifts[p] > 0)); 
         
         console.log(`[ESTAFET] 🎟️ Mendelegasikan tugas ke PAT baru. Sisa nyawa PAT penerus: ${patShifts[nextPat]} shift.`);
 
-        // 5. Tembak API GitHub untuk membangunkan mesin 16GB
         const repoRes = await fetch(`https://api.github.com/repos/${repoFullName}`, {
             headers: { 'Authorization': `Bearer ${nextPat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
         });
         const repoData = await repoRes.json();
         
-        if (!repoData.id) throw new Error("Gagal mendapatkan Repository ID. Periksa nama repo.");
+        if (!repoData.id) throw new Error(`Gagal mendapatkan Repository ID untuk: ${repoFullName}`);
 
-        console.log(`[ESTAFET] 🏗️ Memesan Codespace baru (4-Core/16GB) di GitHub...`);
+        console.log(`[ESTAFET] 🏗️ Memesan Codespace baru di GitHub...`);
+        
+        // 🌟 PERBAIKAN 3: Penghapusan parameter 'machine' agar GitHub mengikuti setting devcontainer.json otomatis
         const createRes = await fetch(`https://api.github.com/user/codespaces`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${nextPat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
             body: JSON.stringify({
                 repository_id: repoData.id,
-                machine: "standardLinux", // PAKSAAN MESIN 16GB
                 idle_timeout_minutes: 240
             })
         });
@@ -278,19 +277,16 @@ async function jalankanProtokolEstafet() {
         }
         console.log(`[ESTAFET] ✅ Pabrik siluman penerus sukses dipesan dan sedang booting!`);
 
-        // 6. SINKRONISASI DETAK JANTUNG (HEARTBEAT CHECK)
         console.log(`[ESTAFET] 📡 Menunggu mesin penerus menyelesaikan QC dan mengambil alih rute Cloudflare...`);
         const oldUrl = await redis.get('active_gateway_url');
         
         const pantauPengambilalihan = setInterval(async () => {
             const currentUrl = await redis.get('active_gateway_url');
             
-            // Jika URL di Redis sudah berubah, artinya mesin penerus sudah siap!
             if (currentUrl && currentUrl !== oldUrl) {
                 clearInterval(pantauPengambilalihan);
                 console.log(`\n[ESTAFET] 🔄 PENGAMBILALIHAN BERHASIL! Rute tugas telah berpindah.`);
                 
-                // 7. PENYEKATAN DAN GRACEFUL DRAINING
                 isRetiring = true; 
                 console.log(`[ESTAFET] 🛑 Menolak tugas baru. Menunggu ${jumlahTugasAktif} tugas tersisa diselesaikan...`);
                 
@@ -302,14 +298,13 @@ async function jalankanProtokolEstafet() {
                         try {
                             const currentCodespaceName = process.env.CODESPACE_NAME;
                             if (currentCodespaceName && myPat) {
-                                // Menghancurkan diri sendiri dari akun GitHub
                                 await fetch(`https://api.github.com/user/codespaces/${currentCodespaceName}`, {
                                     method: 'DELETE',
                                     headers: { 'Authorization': `Bearer ${myPat}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
                                 });
                             }
                         } catch (e) {}
-                        process.exit(0); // Matikan Node.js
+                        process.exit(0); 
                     }
                 }, 5000);
             }
@@ -326,10 +321,13 @@ async function jalankanProtokolEstafet() {
 app.listen(PORT, async () => {
     console.log(`🚀 API Gateway Camoufox menyala di Port ${PORT}`);
     
-    const myPat = await redis.get('current_active_pat');
+    // Perbaikan fallback penempatan PAT pertama
+    const rawMyPat = await redis.get('current_active_pat');
+    const myPat = (typeof rawMyPat === 'string' ? rawMyPat : "").trim();
+    
     if (!myPat) {
         let validPats = await redis.get('github_pats') || [];
-        if (validPats.length > 0) await redis.set('current_active_pat', validPats[0]);
+        if (validPats.length > 0) await redis.set('current_active_pat', validPats[0].trim());
     }
 
     console.log(`[SYSTEM] 🚇 Memulai inisiasi Cloudflare Tunnel seketika...`);
@@ -352,10 +350,9 @@ app.listen(PORT, async () => {
                 console.log(`[SYSTEM] 🔎 Terowongan Tertangkap: ${activeUrl}`);
                 console.log(`[SYSTEM] 🛑 Menahan publikasi URL ke Vercel sampai QC Test selesai...`);
                 
-                const SHIFT_DURATION_MS = 3 * 60 * 1000; 
+                const SHIFT_DURATION_MS = 3 * 60 * 1000; // Mode Pengujian (3 Menit)
                 setTimeout(jalankanProtokolEstafet, SHIFT_DURATION_MS);
                 
-                // 🌟 Meneruskan URL ke fungsi Demo untuk diuji terlebih dahulu
                 await jalankanDemoAwal(activeUrl);
             }
         });
