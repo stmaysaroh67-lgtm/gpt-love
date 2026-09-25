@@ -352,7 +352,7 @@ app.listen(PORT, async () => {
                 console.log(`[SYSTEM] 🔎 Terowongan Tertangkap: ${activeUrl}`);
                 console.log(`[SYSTEM] 🛑 Menahan publikasi URL ke Vercel sampai QC Test selesai...`);
                 
-                const SHIFT_DURATION_MS = 3 * 60 * 60 * 1000; 
+                const SHIFT_DURATION_MS = 3 * 60 * 1000; 
                 setTimeout(jalankanProtokolEstafet, SHIFT_DURATION_MS);
                 
                 // 🌟 Meneruskan URL ke fungsi Demo untuk diuji terlebih dahulu
